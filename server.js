@@ -93,35 +93,71 @@ app.post("/migrations/run/:id", async (req, res) => {
     }
 
       // STATUS → RUNNING
-      migration.status = "running";
-      migration.logs.push(`Started at ${new Date().toLocaleString()}`);
-
-      //  ADD HERE (Git integration)
-      // 🔥 Git integration (FINAL FIX)
-let commitId;
-
-try {
-  execSync("git add .");
+      // 🔁 ROLLBACK MIGRATION (FINAL FIXED VERSION)
+app.post("/migrations/rollback/:id", async (req, res) => {
+  let migration;
 
   try {
-    execSync(`git commit -m "migration_${migration.version}"`, {
-      stdio: "ignore"   // ✅ IMPORTANT (error suppress करेगा)
-    });
-  } catch {
-    console.log("⚠️ No changes to commit");
-  }
+    migration = await Migration.findById(req.params.id);
 
-  commitId = execSync("git rev-parse HEAD")
-    .toString()
-    .trim();
+    if (!migration) {
+      return res.status(404).json({ message: "Migration not found" });
+    }
 
-  migration.gitCommitId = commitId;
-  migration.logs.push(`Git commit: ${commitId}`);
+    // 🟢 STATUS → RUNNING
+    migration.status = "running";
+    migration.logs.push(`Rollback started at ${new Date().toLocaleString()}`);
 
-} catch (err) {
-  console.log("Git error:", err.message);
-}
     await migration.save();
+
+    // 🔥 GIT REVERT (ONLY THIS, NO COMMIT HERE)
+
+    console.log("👉 Commit ID:", migration.gitCommitId);
+    
+    try {
+      if (migration.gitCommitId) {
+        execSync(`git revert ${migration.gitCommitId} --no-edit`, {
+          stdio: "inherit"   // 👈 important (terminal में दिखेगा)
+        });
+
+        migration.logs.push(`Git revert: ${migration.gitCommitId}`);
+      }
+    } catch (err) {
+      console.log("Git revert error:", err.message);
+      migration.logs.push("Git revert failed");
+    }
+
+    // 🔥 DB ROLLBACK
+    const usersCollection = mongoose.connection.collection("users");
+
+    if (migration.down.action === "removeField") {
+      await usersCollection.updateMany({}, { $unset: { email: "" } });
+      migration.logs.push("Field 'email' removed (rollback)");
+    }
+
+    if (migration.down.action === "addField") {
+      await usersCollection.updateMany({}, { $set: { email: "" } });
+      migration.logs.push("Field 'email' added (rollback)");
+    }
+
+    // 🟢 STATUS → ROLLED BACK
+    migration.status = "rolled_back";
+    migration.logs.push(`Rollback completed at ${new Date().toLocaleString()}`);
+
+    await migration.save();
+
+    res.json(migration);
+
+  } catch (err) {
+    if (migration) {
+      migration.status = "failed";
+      migration.logs.push(`Rollback error: ${err.message}`);
+      await migration.save();
+    }
+
+    res.status(500).json({ error: err.message });
+  }
+});
 
     // SHELL PRE CHECK
     preMigrationCheck(migration);
