@@ -93,20 +93,23 @@ app.post("/migrations/run/:id", async (req, res) => {
     }
 
       // STATUS → RUNNING
-      // 🔁 ROLLBACK MIGRATION (FINAL FIXED VERSION)
-app.post("/migrations/rollback/:id", async (req, res) => {
-  let migration;
+      migration.status = "running";
+      migration.logs.push(`Started at ${new Date().toLocaleString()}`);
 
-  try {
-    migration = await Migration.findById(req.params.id);
+      //  ADD HERE (Git integration)
+      execSync("git add .");
+      execSync(`git commit -m "migration_${migration.version}"`);
 
-    if (!migration) {
-      return res.status(404).json({ message: "Migration not found" });
-    }
+      const commitId = execSync("git rev-parse HEAD")
+        .toString()
+        .trim();
 
-    // 🟢 STATUS → RUNNING
-    migration.status = "running";
-    migration.logs.push(`Rollback started at ${new Date().toLocaleString()}`);
+        
+      migration.gitCommitId = commitId;
+      migration.logs.push(`Git commit: ${commitId}`);
+
+    // GIT SIMULATION
+    migration.gitCommitId = "commit_" + Date.now();
 
     await migration.save();
 
