@@ -1,28 +1,43 @@
+const express = require("express");
+const router = express.Router();
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
+const User = require("../models/User");
 
 const SECRET = "secret123";
 
-const verifyToken = (req, res, next) => {
-  const token = req.headers.authorization;
+// REGISTER
+router.post("/register", async (req, res) => {
+  const { username, password, role } = req.body;
 
-  if (!token) return res.status(401).json({ msg: "No token" });
+  const hashed = await bcrypt.hash(password, 10);
 
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch {
-    res.status(401).json({ msg: "Invalid token" });
-  }
-};
+  const user = await User.create({
+    username,
+    password: hashed,
+    role
+  });
 
-const allowRoles = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ msg: "Forbidden" });
-    }
-    next();
-  };
-};
+  res.json(user);
+});
 
-module.exports = { verifyToken, allowRoles };
+// LOGIN
+router.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  const user = await User.findOne({ username });
+  if (!user) return res.status(400).json({ msg: "User not found" });
+
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) return res.status(400).json({ msg: "Wrong password" });
+
+  const token = jwt.sign(
+    { id: user._id, role: user.role },
+    SECRET
+  );
+
+  res.json({ token });
+});
+
+module.exports = router;

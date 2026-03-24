@@ -1,3 +1,4 @@
+const { execSync } = require("child_process");
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
@@ -10,9 +11,9 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// 👇 ADD THIS HERE
+// ADD THIS HERE
 app.use((req, res, next) => {
-  console.log("👉 Incoming:", req.method, req.url);
+  console.log("Incoming:", req.method, req.url);
   next();
 });
 
@@ -22,13 +23,12 @@ app.use("/auth", authRoutes);
 const PORT = process.env.PORT || 5000;
 
 
-// 🔗 MongoDB connect
+//MongoDB connect
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log("Mongo Error:", err));
 
-
-// 🔥 HELPER FUNCTIONS (Shell Simulation)
+//HELPER FUNCTIONS (Shell Simulation)
 
 function preMigrationCheck(migration) {
   console.log("🔍 Pre-migration check");
@@ -47,13 +47,13 @@ function postMigrationCheck() {
 }
 
 
-// 🏠 Test route
+// Test route
 app.get("/", (req, res) => {
   res.send("Migration Tool API Running");
 });
 
 
-// 🚀 CREATE MIGRATION (Duplicate Version Check)
+// CREATE MIGRATION (Duplicate Version Check)
 app.post("/migrations/create", async (req, res) => {
   try {
     const { version } = req.body;
@@ -74,14 +74,14 @@ app.post("/migrations/create", async (req, res) => {
 });
 
 
-// 📥 GET ALL MIGRATIONS
+// GET ALL MIGRATIONS
 app.get("/migrations", async (req, res) => {
   const migrations = await Migration.find();
   res.json(migrations);
 });
 
 
-// ▶ RUN MIGRATION (FULL UPGRADE)
+//  RUN MIGRATION (FULL UPGRADE)
 app.post("/migrations/run/:id", async (req, res) => {
   let migration;
 
@@ -92,9 +92,21 @@ app.post("/migrations/run/:id", async (req, res) => {
       return res.status(404).json({ message: "Migration not found" });
     }
 
-    // STATUS → RUNNING
-    migration.status = "running";
-    migration.logs.push(`Started at ${new Date().toLocaleString()}`);
+      // STATUS → RUNNING
+      migration.status = "running";
+      migration.logs.push(`Started at ${new Date().toLocaleString()}`);
+
+      //  ADD HERE (Git integration)
+      execSync("git add .");
+      execSync(`git commit -m "migration_${migration.version}"`);
+
+      const commitId = execSync("git rev-parse HEAD")
+        .toString()
+        .trim();
+
+        
+      migration.gitCommitId = commitId;
+      migration.logs.push(`Git commit: ${commitId}`);
 
     // GIT SIMULATION
     migration.gitCommitId = "commit_" + Date.now();
@@ -160,7 +172,7 @@ if (migration.up.action === "addField") {
 });
 
 
-// 🔁 ROLLBACK MIGRATION
+//  ROLLBACK MIGRATION
 app.post("/migrations/rollback/:id", async (req, res) => {
   let migration;
 
@@ -207,7 +219,7 @@ app.post("/migrations/rollback/:id", async (req, res) => {
 });
 
 
-// 🚀 START SERVER
+// START SERVER
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
