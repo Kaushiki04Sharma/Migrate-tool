@@ -125,6 +125,7 @@ app.post(
       const result = await users.updateMany({}, {
         $set: { [fieldName]: "" }
       });
+      console.log("✅ Modified count:", result.modifiedCount);
 
       migration.logs.push(
         `Field '${fieldName}' added to ${result.modifiedCount} docs`
