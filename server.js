@@ -97,20 +97,30 @@ app.post("/migrations/run/:id", async (req, res) => {
       migration.logs.push(`Started at ${new Date().toLocaleString()}`);
 
       //  ADD HERE (Git integration)
-      execSync("git add .");
-      execSync(`git commit -m "migration_${migration.version}"`);
+      // 🔥 Git integration (FINAL FIX)
+let commitId;
 
-      const commitId = execSync("git rev-parse HEAD")
-        .toString()
-        .trim();
+try {
+  execSync("git add .");
 
-        
-      migration.gitCommitId = commitId;
-      migration.logs.push(`Git commit: ${commitId}`);
+  try {
+    execSync(`git commit -m "migration_${migration.version}"`, {
+      stdio: "ignore"   // ✅ IMPORTANT (error suppress करेगा)
+    });
+  } catch {
+    console.log("⚠️ No changes to commit");
+  }
 
-    // GIT SIMULATION
-    migration.gitCommitId = "commit_" + Date.now();
+  commitId = execSync("git rev-parse HEAD")
+    .toString()
+    .trim();
 
+  migration.gitCommitId = commitId;
+  migration.logs.push(`Git commit: ${commitId}`);
+
+} catch (err) {
+  console.log("Git error:", err.message);
+}
     await migration.save();
 
     // SHELL PRE CHECK
