@@ -1,33 +1,35 @@
+const { execSync } = require("child_process");
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const { execSync } = require("child_process");
+
 
 const Migration = require("./models/Migration");
-const { verifyToken, allowRoles } = require("./middleware/auth");
-const authRoutes = require("./routes/auth");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-app.use("/auth", authRoutes);
-
-const PORT = process.env.PORT || 5000;
-
-// ================= DB CONNECT =================
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected"))
-  .catch(err => console.log(err));
-
-// ================= DEBUG =================
+// ADD THIS HERE
 app.use((req, res, next) => {
   console.log("Incoming:", req.method, req.url);
   next();
 });
 
-// ================= HELPER FUNCTIONS =================
+const authRoutes = require("./routes/auth");
+app.use("/auth", authRoutes);
+
+const PORT = process.env.PORT || 5000;
+
+
+//MongoDB connect
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.log("Mongo Error:", err));
+
+//HELPER FUNCTIONS (Shell Simulation)
+
 function preMigrationCheck(migration) {
   console.log("🔍 Pre-migration check");
 
@@ -44,208 +46,229 @@ function postMigrationCheck() {
   console.log("✅ Post migration validation done");
 }
 
-// ================= ROOT =================
+
+// Test route
 app.get("/", (req, res) => {
   res.send("Migration Tool API Running");
 });
 
 
-// ================= CREATE =================
-app.post(
-  "/migrations/create",
-  verifyToken,
-  allowRoles("admin", "developer"),
-  async (req, res) => {
-    try {
-      const existing = await Migration.findOne({ version: req.body.version });
+// CREATE MIGRATION (Duplicate Version Check)
+app.post("/migrations/create", async (req, res) => {
+  try {
+    const { version } = req.body;
 
-      if (existing) {
-        return res.status(400).json({ message: "Version exists" });
-      }
+    const existing = await Migration.findOne({ version });
 
-      const migration = await Migration.create(req.body);
-      res.json(migration);
-
-    } catch (err) {
-      res.status(500).json({ error: err.message });
+    if (existing) {
+      return res.status(400).json({ message: "Version already exists" });
     }
+
+    const migration = await Migration.create(req.body);
+
+    res.json(migration);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-);
+});
 
 
-// ================= GET =================
-app.get(
-  "/migrations",
-  verifyToken,
-  allowRoles("admin", "developer", "viewer"),
-  async (req, res) => {
-    const migrations = await Migration.find();
-    res.json(migrations);
-  }
-);
+// GET ALL MIGRATIONS
+app.get("/migrations", async (req, res) => {
+  const migrations = await Migration.find();
+  res.json(migrations);
+});
 
 
-// ================= RUN =================
-app.post(
-  "/migrations/run/:id",
-  verifyToken,
-  allowRoles("admin"),
-  async (req, res) => {
-    let migration;
+//  RUN MIGRATION (FULL UPGRADE)
+app.post("/migrations/run/:id", async (req, res) => {
+  let migration;
 
-    try {
-      migration = await Migration.findById(req.params.id);
+  try {
+    migration = await Migration.findById(req.params.id);
 
-      if (!migration) {
-        return res.status(404).json({ message: "Migration not found" });
-      }
+    if (!migration) {
+      return res.status(404).json({ message: "Migration not found" });
+    }
 
       // STATUS → RUNNING
       migration.status = "running";
       migration.logs.push(`Started at ${new Date().toLocaleString()}`);
-      await migration.save();
 
-      // PRE CHECK
-      preMigrationCheck(migration);
-
-      const users = mongoose.connection.collection("users");
-
-      // 🔥 Dynamic field
-      const fieldName = migration.name.includes("phone")
-        ? "phone"
-        : migration.name.includes("age")
-        ? "age"
-        : "email";
-
-      // VALIDATION
-      const exists = await users.findOne({ [fieldName]: { $exists: true } });
-      if (exists) throw new Error(`Field '${fieldName}' already exists`);
-
-      // DB UPDATE
-      const result = await users.updateMany({}, {
-        $set: { [fieldName]: "" }
-      });
-      console.log("✅ Modified count:", result.modifiedCount);
-
-      migration.logs.push(
-        `Field '${fieldName}' added to ${result.modifiedCount} docs`
-      );
-
-      // POST CHECK
-      postMigrationCheck();
-
-      // GIT COMMIT
+      //  ADD HERE (Git integration)
       execSync("git add .");
-      try {
-        execSync(`git commit -m "migration_${migration.version}"`, {
-          stdio: "ignore"
-        });
-      } catch {}
+      execSync(`git commit -m "migration_${migration.version}"`);
 
       const commitId = execSync("git rev-parse HEAD")
         .toString()
         .trim();
 
+        
       migration.gitCommitId = commitId;
       migration.logs.push(`Git commit: ${commitId}`);
 
-      // COMPLETE
-      migration.status = "completed";
-      migration.logs.push(`Completed at ${new Date().toLocaleString()}`);
+    // GIT SIMULATION
+    migration.gitCommitId = "commit_" + Date.now();
 
-      await migration.save();
+    await migration.save();
 
-      res.json(migration);
+    // 🔥 GIT REVERT (ONLY THIS, NO COMMIT HERE)
 
-    } catch (err) {
-      if (migration) {
-        migration.status = "failed";
-        migration.logs.push(`Error: ${err.message}`);
-        await migration.save();
-      }
-
-      res.status(500).json({ error: err.message });
-    }
-  }
-);
-
-
-// ================= ROLLBACK =================
-app.post(
-  "/migrations/rollback/:id",
-  verifyToken,
-  allowRoles("admin"),
-  async (req, res) => {
-    let migration;
-
+    console.log("👉 Commit ID:", migration.gitCommitId);
+    
     try {
-      migration = await Migration.findById(req.params.id);
-
-      if (!migration) {
-        return res.status(404).json({ message: "Migration not found" });
-      }
-
-      // STATUS → RUNNING
-      migration.status = "running";
-      migration.logs.push(`Rollback started at ${new Date().toLocaleString()}`);
-      await migration.save();
-
-      const users = mongoose.connection.collection("users");
-
-      // 🔥 Dynamic field
-      const fieldName = migration.name.includes("phone")
-        ? "phone"
-        : migration.name.includes("age")
-        ? "age"
-        : "email";
-
-      // AUTO SAVE
-      execSync("git add .");
-      try {
-        execSync(`git commit -m "auto-save before rollback"`, {
-          stdio: "ignore"
-        });
-      } catch {}
-
-      // GIT REVERT
       if (migration.gitCommitId) {
-        execSync(
-          `git revert ${migration.gitCommitId} --no-edit -X theirs`,
-          { stdio: "inherit" }
-        );
+        execSync(`git revert ${migration.gitCommitId} --no-edit`, {
+          stdio: "inherit"   // 👈 important (terminal में दिखेगा)
+        });
 
         migration.logs.push(`Git revert: ${migration.gitCommitId}`);
       }
-
-      // DB REMOVE
-      await users.updateMany({}, {
-        $unset: { [fieldName]: "" }
-      });
-
-      migration.logs.push(`Field '${fieldName}' removed`);
-
-      // COMPLETE
-      migration.status = "rolled_back";
-      migration.logs.push(`Rollback completed at ${new Date().toLocaleString()}`);
-
-      await migration.save();
-
-      res.json(migration);
-
     } catch (err) {
-      if (migration) {
-        migration.status = "failed";
-        migration.logs.push(`Rollback error: ${err.message}`);
-        await migration.save();
+      console.log("Git revert error:", err.message);
+      migration.logs.push("Git revert failed");
+    }
+
+    // 🔥 DB ROLLBACK
+    const usersCollection = mongoose.connection.collection("users");
+
+    if (migration.down.action === "removeField") {
+      await usersCollection.updateMany({}, { $unset: { email: "" } });
+      migration.logs.push("Field 'email' removed (rollback)");
+    }
+
+    if (migration.down.action === "addField") {
+      await usersCollection.updateMany({}, { $set: { email: "" } });
+      migration.logs.push("Field 'email' added (rollback)");
+    }
+
+    // 🟢 STATUS → ROLLED BACK
+    migration.status = "rolled_back";
+    migration.logs.push(`Rollback completed at ${new Date().toLocaleString()}`);
+
+    await migration.save();
+
+    res.json(migration);
+
+  } catch (err) {
+    if (migration) {
+      migration.status = "failed";
+      migration.logs.push(`Rollback error: ${err.message}`);
+      await migration.save();
+    }
+
+    res.status(500).json({ error: err.message });
+  }
+});
+
+    // SHELL PRE CHECK
+    preMigrationCheck(migration);
+
+    const db = mongoose.connection.db;
+const usersCollection = db.collection("users");
+
+if (migration.up.action === "addField") {
+
+  const exists = await usersCollection.findOne({ email: { $exists: true } });
+
+  if (exists) {
+    throw new Error("Field 'email' already exists");
+  }
+
+  const result = await usersCollection.updateMany(
+    {},
+    { $set: { email: "" } }
+  );
+
+  console.log("✅ Modified count:", result.modifiedCount);
+
+  migration.logs.push(`Field 'email' added to ${result.modifiedCount} docs`);
+}
+    if (migration.up.action === "removeField") {
+      const sample = await usersCollection.findOne();
+
+      if (!sample || sample.email === undefined) {
+        throw new Error("Field 'email' does not exist");
       }
 
-      res.status(500).json({ error: err.message });
+      await usersCollection.updateMany({}, { $unset: { email: "" } });
+      migration.logs.push("Field 'email' removed");
     }
+
+    // POST CHECK
+    postMigrationCheck();
+
+    // STATUS → COMPLETED
+    migration.status = "completed";
+    migration.logs.push(`Completed at ${new Date().toLocaleString()}`);
+
+    await migration.save();
+
+    res.json(migration);
+
+  } catch (err) {
+    console.error(err);
+
+    if (migration) {
+      migration.status = "failed";
+      migration.logs.push(`Error: ${err.message}`);
+      await migration.save();
+    }
+
+    res.status(500).json({ error: err.message });
   }
-);
+});
 
 
-// ================= START =================
+//  ROLLBACK MIGRATION
+app.post("/migrations/rollback/:id", async (req, res) => {
+  let migration;
+
+  try {
+    migration = await Migration.findById(req.params.id);
+
+    if (!migration) {
+      return res.status(404).json({ message: "Migration not found" });
+    }
+
+    migration.status = "running";
+    migration.logs.push(`Rollback started at ${new Date().toLocaleString()}`);
+
+    await migration.save();
+
+    const usersCollection = mongoose.connection.collection("users");
+
+    if (migration.down.action === "removeField") {
+      await usersCollection.updateMany({}, { $unset: { email: "" } });
+      migration.logs.push("Field 'email' removed (rollback)");
+    }
+
+    if (migration.down.action === "addField") {
+      await usersCollection.updateMany({}, { $set: { email: "" } });
+      migration.logs.push("Field 'email' added (rollback)");
+    }
+
+    migration.status = "rolled_back";
+    migration.logs.push(`Rollback completed at ${new Date().toLocaleString()}`);
+
+    await migration.save();
+
+    res.json(migration);
+
+  } catch (err) {
+    if (migration) {
+      migration.status = "failed";
+      migration.logs.push(`Rollback error: ${err.message}`);
+      await migration.save();
+    }
+
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// START SERVER
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log(`Server running on port ${PORT}`);
 });
