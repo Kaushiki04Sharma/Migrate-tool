@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const migrationSchema = new mongoose.Schema({
-  name: String,
+  name: String,   //updated
   version: String,
 
   up: Object,
