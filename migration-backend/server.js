@@ -117,7 +117,7 @@ app.post(
         ? "age"
         : "email";
 
-      // VALIDATION
+      // validation for shell
       const exists = await users.findOne({ [fieldName]: { $exists: true } });
       if (exists) throw new Error(`Field '${fieldName}' already exists`);
 
