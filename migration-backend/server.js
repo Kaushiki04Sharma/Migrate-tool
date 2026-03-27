@@ -101,6 +101,13 @@ app.post(
       }
 
       // STATUS → RUNNING
+      migration.status = "pending";
+      migration.logs.push("Queued for execution");
+      await migration.save();
+
+     // small delay (queue feel)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       migration.status = "running";
       migration.logs.push(`Started at ${new Date().toLocaleString()}`);
       await migration.save();
