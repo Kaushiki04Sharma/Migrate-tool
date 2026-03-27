@@ -6,7 +6,7 @@ const { execSync } = require("child_process");
 
 const Migration = require("./models/Migration");
 const { verifyToken, allowRoles } = require("./middleware/auth");
-const authRoutes = require("../routes/auth");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 app.use(express.json());
@@ -57,13 +57,27 @@ app.post(
   allowRoles("admin", "developer"),
   async (req, res) => {
     try {
-      const existing = await Migration.findOne({ version: req.body.version });
+      const { name, version } = req.body;
 
+      const existing = await Migration.findOne({ version });
       if (existing) {
         return res.status(400).json({ message: "Version exists" });
       }
 
-      const migration = await Migration.create(req.body);
+      // 👉 auto add up/down actions
+      const migration = await Migration.create({
+        name,
+        version,
+        up: {
+          action: "addField"
+        },
+        down: {
+          action: "removeField"
+        },
+        status: "pending",
+        logs: []
+      });
+
       res.json(migration);
 
     } catch (err) {
