@@ -6,7 +6,7 @@ const { execSync } = require("child_process");
 
 const Migration = require("./models/Migration");
 const { verifyToken, allowRoles } = require("./middleware/auth");
-const authRoutes = require("../routes/auth");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 app.use(express.json());
@@ -117,7 +117,7 @@ app.post(
         ? "age"
         : "email";
 
-      // VALIDATION
+      // validation for shell
       const exists = await users.findOne({ [fieldName]: { $exists: true } });
       if (exists) throw new Error(`Field '${fieldName}' already exists`);
 
