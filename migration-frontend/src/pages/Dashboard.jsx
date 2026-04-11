@@ -14,7 +14,14 @@ export default function Dashboard() {
   const [selectedLogs, setSelectedLogs] = useState(null)
   const [actionLoading, setActionLoading] = useState(null)
   const role = localStorage.getItem('role') || 'viewer'
+  const [gitHistory, setGitHistory] = useState([])
 
+async function fetchGitHistory() {
+  try {
+    const { data } = await api.get('/git-history')
+    setGitHistory(data)
+  } catch { }
+}
   async function fetchMigrations() {
     try {
       const { data } = await api.get('/migrations')
@@ -24,7 +31,10 @@ export default function Dashboard() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchMigrations() }, [])
+  useEffect(() => { 
+  fetchMigrations()
+  fetchGitHistory()
+   }, [])
 
   async function runMigration(m) {
     if (!window.confirm(`Run migration "${m.name}"?`)) return
@@ -176,6 +186,64 @@ export default function Dashboard() {
         {selectedLogs && (
           <LogsPanel migration={selectedLogs} onClose={() => setSelectedLogs(null)} />
         )}
+
+        {/* Git History */}
+          <div style={{
+            background: 'var(--bg2)', border: '0.5px solid var(--border)',
+            borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginTop: '1.25rem',
+          }} className="fade-up">
+            <div style={{
+              padding: '10px 16px', background: 'var(--bg3)',
+              borderBottom: '0.5px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Git History
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>last 20 commits</span>
+              </div>
+              <button onClick={fetchGitHistory} style={{
+                fontSize: '11px', padding: '4px 10px', fontFamily: 'var(--font-mono)',
+                border: '0.5px solid var(--border2)', borderRadius: 'var(--radius)',
+                background: 'transparent', color: 'var(--text2)', cursor: 'pointer'
+              }}>Refresh</button>
+            </div>
+            <div style={{ padding: '12px 16px', maxHeight: '220px', overflowY: 'auto' }}>
+              {gitHistory.length === 0 ? (
+                <div style={{ fontSize: '12px', color: 'var(--text3)' }}>No git history found.</div>
+              ) : gitHistory.map((commit, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '6px 0', borderBottom: '0.5px solid var(--border)',
+                }}>
+                  <span style={{
+                    fontSize: '11px', fontFamily: 'var(--font-mono)',
+                    color: 'var(--purple)', flexShrink: 0
+                  }}>{commit.hash}</span>
+                  <span style={{
+                    fontSize: '12px',
+                    color: commit.message.includes('Revert')
+                      ? 'var(--red)' : commit.message.includes('migration')
+                      ? 'var(--green)' : 'var(--text2)',
+                    flex: 1
+                  }}>{commit.message}</span>
+                  <span style={{
+                    fontSize: '10px', padding: '2px 8px', borderRadius: '999px',
+                    background: commit.message.includes('Revert')
+                      ? 'var(--red-bg)' : commit.message.includes('migration')
+                      ? 'var(--green-bg)' : 'var(--bg4)',
+                    color: commit.message.includes('Revert')
+                      ? 'var(--red)' : commit.message.includes('migration')
+                      ? 'var(--green)' : 'var(--text3)',
+                    flexShrink: 0
+                  }}>
+                    {commit.message.includes('Revert') ? 'rollback' : commit.message.includes('migration') ? 'migration' : 'other'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
 
       </div>
 

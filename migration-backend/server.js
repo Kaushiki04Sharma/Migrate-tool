@@ -110,12 +110,12 @@ app.post(
 
       const users = mongoose.connection.collection("users");
 
-      // 🔥 Dynamic field
-      const fieldName = migration.name.includes("phone")
-        ? "phone"
-        : migration.name.includes("age")
-        ? "age"
-        : "email";
+      //  Dynamic field
+      const fieldName = migration.name
+        .replace(/^add_/, "")
+        .replace(/_field$/, "")
+        .replace(/_/g, "")
+        .toLowerCase();
 
       // validation for shell
       const exists = await users.findOne({ [fieldName]: { $exists: true } });
@@ -192,12 +192,11 @@ app.post(
 
       const users = mongoose.connection.collection("users");
 
-      // 🔥 Dynamic field
-      const fieldName = migration.name.includes("phone")
-        ? "phone"
-        : migration.name.includes("age")
-        ? "age"
-        : "email";
+      const fieldName = migration.name
+        .replace(/^add_/, "")
+        .replace(/_field$/, "")
+        .replace(/_/g, "")
+        .toLowerCase();
 
       // AUTO SAVE
       execSync("git add .");
@@ -239,6 +238,24 @@ app.post(
         await migration.save();
       }
 
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ================= GIT HISTORY =================
+app.get(
+  "/git-history",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const log = execSync("git log --oneline -20").toString().trim();
+      const lines = log.split("\n").map(line => {
+        const [hash, ...rest] = line.split(" ");
+        return { hash, message: rest.join(" ") };
+      });
+      res.json(lines);
+    } catch (err) {
       res.status(500).json({ error: err.message });
     }
   }
