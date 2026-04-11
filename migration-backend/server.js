@@ -111,11 +111,11 @@ app.post(
       const users = mongoose.connection.collection("users");
 
       // 🔥 Dynamic field
-      const fieldName = migration.name.includes("phone")
-        ? "phone"
-        : migration.name.includes("age")
-        ? "age"
-        : "email";
+      const fieldName = migration.name
+          .replace(/^add_/, "")
+          .replace(/_field$/, "")
+          .replace(/_/g, "")
+          .toLowerCase();
 
       // validation for shell
       const exists = await users.findOne({ [fieldName]: { $exists: true } });
@@ -193,11 +193,11 @@ app.post(
       const users = mongoose.connection.collection("users");
 
       // 🔥 Dynamic field
-      const fieldName = migration.name.includes("phone")
-        ? "phone"
-        : migration.name.includes("age")
-        ? "age"
-        : "email";
+      const fieldName = migration.name
+        .replace(/^add_/, "")
+        .replace(/_field$/, "")
+        .replace(/_/g, "")
+        .toLowerCase();
 
       // AUTO SAVE
       execSync("git add .");
