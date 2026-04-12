@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 const roleColors = {
@@ -10,6 +10,7 @@ const roleColors = {
 
 export default function Navbar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const role = localStorage.getItem('role') || 'viewer'
   const rc = roleColors[role] || roleColors.viewer
 
@@ -19,6 +20,16 @@ export default function Navbar() {
     toast.success('Logged out')
     navigate('/login')
   }
+
+  const navLink = (path, label) => (
+    <button onClick={() => navigate(path)} style={{
+      fontSize: '12px', padding: '5px 12px', fontFamily: 'var(--font-mono)',
+      border: '0.5px solid ' + (location.pathname === path ? 'var(--green)' : 'var(--border2)'),
+      borderRadius: 'var(--radius)', background: 'transparent',
+      color: location.pathname === path ? 'var(--green)' : 'var(--text2)',
+      cursor: 'pointer',
+    }}>{label}</button>
+  )
 
   return (
     <nav style={{
@@ -31,7 +42,9 @@ export default function Navbar() {
         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--green)', display: 'inline-block', boxShadow: '0 0 8px var(--green)' }} />
         MigrateTool
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {navLink('/dashboard', 'Migrations')}
+        {navLink('/git-history', 'Git History')}
         <span style={{
           fontSize: '10px', padding: '3px 9px', borderRadius: '999px',
           background: rc.bg, color: rc.color,
