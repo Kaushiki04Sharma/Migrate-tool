@@ -4,7 +4,7 @@ import Navbar from '../components/Navbar'
 import StatCard from '../components/StatCard'
 import StatusBadge from '../components/StatusBadge'
 import CreateMigrationModal from '../components/CreateMigrationModal'
-import LogsPanel from '../components/LogsPanel'
+import MigrationModal from '../components/MigrationModal'
 import api from '../api'
 
 export default function Dashboard() {
@@ -14,7 +14,14 @@ export default function Dashboard() {
   const [selectedLogs, setSelectedLogs] = useState(null)
   const [actionLoading, setActionLoading] = useState(null)
   const role = localStorage.getItem('role') || 'viewer'
+  const [gitHistory, setGitHistory] = useState([])
 
+async function fetchGitHistory() {
+  try {
+    const { data } = await api.get('/git-history')
+    setGitHistory(data)
+  } catch { }
+}
   async function fetchMigrations() {
     try {
       const { data } = await api.get('/migrations')
@@ -24,7 +31,7 @@ export default function Dashboard() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchMigrations() }, [])
+   useEffect(() => { fetchMigrations() }, [])
 
   async function runMigration(m) {
     if (!window.confirm(`Run migration "${m.name}"?`)) return
@@ -172,10 +179,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Logs Panel */}
         {selectedLogs && (
-          <LogsPanel migration={selectedLogs} onClose={() => setSelectedLogs(null)} />
+          <MigrationModal migration={selectedLogs} onClose={() => setSelectedLogs(null)} />
         )}
+
 
       </div>
 
