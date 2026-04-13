@@ -28,6 +28,7 @@ export default function App() {
           error: { iconTheme: { primary: '#ff4d6a', secondary: '#0a0c0f' } },
         }}
       />
+      //create routes
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />

@@ -2,7 +2,6 @@ const jwt = require("jsonwebtoken");
 
 const SECRET = "secret123";
 
-// 🔐 VERIFY TOKEN
 function verifyToken(req, res, next) {
   const token = req.headers["authorization"];
 
@@ -19,7 +18,6 @@ function verifyToken(req, res, next) {
   }
 }
 
-// 🔐 ROLE BASED ACCESS
 function allowRoles(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
